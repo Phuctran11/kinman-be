@@ -5,34 +5,54 @@ import { TransactionEntity } from "../entities/transaction.entity";
 import { CreateTransactionDto, TransactionFilterDto, UpdateTransactionDto } from "../dtos/transaction.dto";
 import { WalletsService } from "../../wallets/services/wallets.service";
 import { CategoriesService } from "../../categories/services/categories.service";
+import { GroupsService } from "../../groups/services/groups.service";
+import { TransactionSplitEntity } from "../entities/transaction-split.entity";
+
 import { CategoryType } from "../../categories/entities/category.entity";
 
 @Injectable()
 export class TransactionsService {
   constructor(
     @InjectRepository(TransactionEntity)
+    @InjectRepository(TransactionEntity)
     private readonly transactionRepo: Repository<TransactionEntity>,
+    @InjectRepository(TransactionSplitEntity)
+    private readonly splitRepo: Repository<TransactionSplitEntity>,
     private readonly walletsService: WalletsService,
     private readonly categoriesService: CategoriesService,
+    private readonly groupsService: GroupsService,
   ) {}
 
   async create(userId: string, dto: CreateTransactionDto) {
-    const category = await this.categoriesService.findOne(dto.categoryId, userId);
-    const wallet = await this.walletsService.findOne(dto.walletId, userId);
+    const category = dto.categoryId ? await this.categoriesService.findOne(dto.categoryId, userId) : undefined;
+    const wallet = dto.walletId ? await this.walletsService.findOne(dto.walletId, userId) : undefined;
+    let group: any = undefined;
+    if (dto.groupId) {
+      group = await this.groupsService.findOne(dto.groupId, userId);
+    }
 
     const transaction = this.transactionRepo.create({
       ...dto,
       user: { id: userId },
       category,
       wallet,
+      group,
     });
+
+    if (dto.splits && dto.splits.length > 0) {
+      transaction.splits = dto.splits.map(s => this.splitRepo.create({
+        amount: s.amount,
+        user: { id: s.userId }
+      }));
+    }
 
     await this.transactionRepo.save(transaction);
 
     // Update wallet balance
-    const amount = category.type === CategoryType.INCOME ? dto.amount : -dto.amount;
-    await this.walletsService.updateBalance(wallet.id, amount);
-
+    const amount = category?.type === CategoryType.INCOME ? dto.amount : -dto.amount;
+    if (wallet) {
+      await this.walletsService.updateBalance(wallet.id, amount);
+    }
     return transaction;
   }
 

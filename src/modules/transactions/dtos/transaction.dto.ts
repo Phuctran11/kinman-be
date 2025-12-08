@@ -24,13 +24,34 @@ export class CreateTransactionDto {
 
   @ApiProperty()
   @IsUUID()
-  @IsNotEmpty()
-  categoryId: string;
+  @IsOptional()
+  categoryId?: string;
 
   @ApiProperty()
   @IsUUID()
-  @IsNotEmpty()
-  walletId: string;
+  @IsOptional()
+  walletId?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsUUID()
+  groupId?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  splits?: TransactionSplitDto[];
+}
+
+export class TransactionSplitDto {
+  @ApiProperty()
+  @IsUUID()
+  @IsOptional()
+  userId?: string;
+
+  @ApiProperty()
+  @IsNumber()
+  @IsOptional()
+  amount: number;
 }
 
 export class UpdateTransactionDto extends CreateTransactionDto {}

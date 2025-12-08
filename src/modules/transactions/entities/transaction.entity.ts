@@ -1,8 +1,10 @@
-import { Column, Entity, ManyToOne } from "typeorm";
+import { Column, Entity, ManyToOne, OneToMany } from "typeorm";
 import { SoftDeleteEntity } from "../../../common/entities/soft-delete-entity";
 import { UserEntity } from "../../auth/entities/user.entity";
 import { CategoryEntity } from "../../categories/entities/category.entity";
 import { WalletEntity } from "../../wallets/entities/wallet.entity";
+import { GroupEntity } from "../../groups/entities/group.entity";
+import { TransactionSplitEntity } from "./transaction-split.entity";
 
 @Entity()
 export class TransactionEntity extends SoftDeleteEntity {
@@ -18,12 +20,18 @@ export class TransactionEntity extends SoftDeleteEntity {
   @Column({ nullable: true })
   imageUrl: string;
 
-  @ManyToOne(() => CategoryEntity)
+  @ManyToOne(() => CategoryEntity, {nullable: true})
   category: CategoryEntity;
 
-  @ManyToOne(() => WalletEntity)
+  @ManyToOne(() => WalletEntity, {nullable: true})
   wallet: WalletEntity;
 
   @ManyToOne(() => UserEntity)
   user: UserEntity;
+
+  @ManyToOne(() => GroupEntity, { nullable: true })
+  group: GroupEntity;
+
+  @OneToMany(() => TransactionSplitEntity, split => split.transaction, { cascade: true })
+  splits: TransactionSplitEntity[];
 }
