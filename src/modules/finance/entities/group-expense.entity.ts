@@ -1,7 +1,7 @@
 import { Column, Entity, ManyToOne } from "typeorm";
 import { SoftDeleteEntity } from "../../../common/entities/soft-delete-entity";
 import { UserEntity } from "../../auth/entities/user.entity";
-import { GroupEntity } from "./group.entity";
+import { GroupEntity } from "../entities/group.entity";
 
 export enum SplitType {
   EQUAL = "equal",

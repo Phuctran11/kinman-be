@@ -6,6 +6,8 @@ import { GroupMemberEntity } from "../entities/group-member.entity";
 import { UserEntity } from "../../auth/entities/user.entity";
 import { AddMemberDto, CreateGroupDto } from "../dtos/group.dto";
 import { nanoid } from "nanoid";
+import { NotificationDispatcherService } from "../../notification/services/notification-dispatcher.service";
+import { NotificationType } from "../../notification/entities/notification.entity";
 
 @Injectable()
 export class GroupsService {
@@ -16,6 +18,7 @@ export class GroupsService {
     private readonly memberRepo: Repository<GroupMemberEntity>,
     @InjectRepository(UserEntity)
     private readonly userRepo: Repository<UserEntity>,
+    private readonly notificationDispatcher: NotificationDispatcherService,
   ) {}
 
   async create(userId: string, dto: CreateGroupDto) {
@@ -84,14 +87,32 @@ export class GroupsService {
       throw new BadRequestException("User is already a member");
     }
 
-    return this.memberRepo.save({
+    const member = await this.memberRepo.save({
       group,
       user: userToAdd,
     });
+
+    // Notify other group members about new member
+    const otherMembers = group.members.filter(m => m.user.id !== userToAdd.id);
+    for (const m of otherMembers) {
+      await this.notificationDispatcher.dispatch({
+        userId: m.user.id,
+        email: m.user.email,
+        type: NotificationType.GROUP_JOIN,
+        title: `${userToAdd.name || userToAdd.email} đã tham gia nhóm`,
+        body: `${userToAdd.name || userToAdd.email} vừa được thêm vào nhóm "${group.name}".`,
+        data: { groupId: group.id, groupName: group.name },
+      });
+    }
+
+    return member;
   }
 
   async joinByCode(userId: string, code: string) {
-    const group = await this.groupRepo.findOne({ where: { code } });
+    const group = await this.groupRepo.findOne({
+      where: { code },
+      relations: ["members", "members.user"],
+    });
     if (!group) {
       throw new NotFoundException("Invalid group code");
     }
@@ -104,10 +125,26 @@ export class GroupsService {
       return group; // Already joined
     }
 
+    const joiningUser = await this.userRepo.findOne({ where: { id: userId } });
+
     await this.memberRepo.save({
       group,
       user: { id: userId },
     });
+
+    // Notify other group members about new member joining
+    if (joiningUser) {
+      for (const m of group.members) {
+        await this.notificationDispatcher.dispatch({
+          userId: m.user.id,
+          email: m.user.email,
+          type: NotificationType.GROUP_JOIN,
+          title: `${joiningUser.name || joiningUser.email} đã tham gia nhóm`,
+          body: `${joiningUser.name || joiningUser.email} vừa tham gia nhóm "${group.name}" bằng mã mời.`,
+          data: { groupId: group.id, groupName: group.name },
+        });
+      }
+    }
 
     return group;
   }

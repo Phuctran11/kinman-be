@@ -1,9 +1,9 @@
 import { Column, Entity, ManyToOne, OneToMany } from "typeorm";
 import { SoftDeleteEntity } from "../../../common/entities/soft-delete-entity";
 import { UserEntity } from "../../auth/entities/user.entity";
-import { CategoryEntity } from "../../categories/entities/category.entity";
-import { WalletEntity } from "../../wallets/entities/wallet.entity";
-import { GroupEntity } from "../../groups/entities/group.entity";
+import { CategoryEntity } from "./category.entity";
+import { WalletEntity } from "./wallet.entity";
+import { GroupEntity } from "./group.entity";
 import { TransactionSplitEntity } from "./transaction-split.entity";
 
 @Entity()
@@ -20,10 +20,10 @@ export class TransactionEntity extends SoftDeleteEntity {
   @Column({ nullable: true })
   imageUrl: string;
 
-  @ManyToOne(() => CategoryEntity, {nullable: true})
+  @ManyToOne(() => CategoryEntity, { nullable: true })
   category: CategoryEntity;
 
-  @ManyToOne(() => WalletEntity, {nullable: true})
+  @ManyToOne(() => WalletEntity, { nullable: true })
   wallet: WalletEntity;
 
   @ManyToOne(() => UserEntity)

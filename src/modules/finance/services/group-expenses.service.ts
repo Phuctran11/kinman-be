@@ -6,6 +6,9 @@ import { CreateGroupExpenseDto } from "../dtos/group-expense.dto";
 import { GroupsService } from "./groups.service";
 import { SettleUpDto } from "../dtos/settle-up.dto";
 import { SettlementEntity } from "../entities/settlement.entity";
+import { UserEntity } from "../../auth/entities/user.entity";
+import { NotificationDispatcherService } from "../../notification/services/notification-dispatcher.service";
+import { NotificationType } from "../../notification/entities/notification.entity";
 
 @Injectable()
 export class GroupExpensesService {
@@ -14,11 +17,15 @@ export class GroupExpensesService {
     private readonly expenseRepo: Repository<GroupExpenseEntity>,
     @InjectRepository(SettlementEntity)
     private readonly settlementRepo: Repository<SettlementEntity>,
+    @InjectRepository(UserEntity)
+    private readonly userRepo: Repository<UserEntity>,
     private readonly groupsService: GroupsService,
+    private readonly notificationDispatcher: NotificationDispatcherService,
   ) {}
 
   async addExpense(userId: string, groupId: string, dto: CreateGroupExpenseDto) {
     const group = await this.groupsService.findOne(groupId, userId);
+    const payer = await this.userRepo.findOne({ where: { id: userId } });
 
     let splits = dto.splits;
 
@@ -44,7 +51,29 @@ export class GroupExpensesService {
       splits,
     });
 
-    return this.expenseRepo.save(expense);
+    const savedExpense = await this.expenseRepo.save(expense);
+
+    // Notify group members about new expense (except payer)
+    const otherMembers = group.members.filter(m => m.user.id !== userId);
+    for (const member of otherMembers) {
+      await this.notificationDispatcher.dispatch({
+        userId: member.user.id,
+        email: member.user.email,
+        type: NotificationType.GROUP_TRANSACTION,
+        title: `Chi tiêu mới trong "${group.name}"`,
+        body: `${payer?.name || payer?.email || "Một thành viên"} đã thêm khoản chi "${dto.description}" - ${dto.amount.toLocaleString("vi-VN")}đ`,
+        data: {
+          groupId: group.id,
+          groupName: group.name,
+          expenseId: savedExpense.id,
+          expenseDescription: dto.description,
+          expenseAmount: dto.amount,
+          paidBy: payer?.name || payer?.email,
+        },
+      });
+    }
+
+    return savedExpense;
   }
 
   async getExpenses(userId: string, groupId: string) {

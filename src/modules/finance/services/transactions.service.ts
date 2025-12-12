@@ -3,17 +3,15 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Between, Repository } from "typeorm";
 import { TransactionEntity } from "../entities/transaction.entity";
 import { CreateTransactionDto, TransactionFilterDto, UpdateTransactionDto } from "../dtos/transaction.dto";
-import { WalletsService } from "../../wallets/services/wallets.service";
-import { CategoriesService } from "../../categories/services/categories.service";
-import { GroupsService } from "../../groups/services/groups.service";
+import { WalletsService } from "../services/wallets.service";
+import { CategoriesService } from "../services/categories.service";
+import { GroupsService } from "../services/groups.service";
 import { TransactionSplitEntity } from "../entities/transaction-split.entity";
-
-import { CategoryType } from "../../categories/entities/category.entity";
+import { CategoryType } from "../entities/category.entity";
 
 @Injectable()
 export class TransactionsService {
   constructor(
-    @InjectRepository(TransactionEntity)
     @InjectRepository(TransactionEntity)
     private readonly transactionRepo: Repository<TransactionEntity>,
     @InjectRepository(TransactionSplitEntity)
@@ -26,7 +24,7 @@ export class TransactionsService {
   async create(userId: string, dto: CreateTransactionDto) {
     const category = dto.categoryId ? await this.categoriesService.findOne(dto.categoryId, userId) : undefined;
     const wallet = dto.walletId ? await this.walletsService.findOne(dto.walletId, userId) : undefined;
-    let group: any = undefined;
+    let group: any;
     if (dto.groupId) {
       group = await this.groupsService.findOne(dto.groupId, userId);
     }
@@ -42,7 +40,7 @@ export class TransactionsService {
     if (dto.splits && dto.splits.length > 0) {
       transaction.splits = dto.splits.map(s => this.splitRepo.create({
         amount: s.amount,
-        user: { id: s.userId }
+        user: { id: s.userId },
       }));
     }
 

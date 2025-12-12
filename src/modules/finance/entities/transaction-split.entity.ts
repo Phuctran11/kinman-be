@@ -1,6 +1,6 @@
 import { Column, Entity, ManyToOne } from "typeorm";
 import { SoftDeleteEntity } from "../../../common/entities/soft-delete-entity";
-import { TransactionEntity } from "./transaction.entity";
+import { TransactionEntity } from "../entities/transaction.entity";
 import { UserEntity } from "../../auth/entities/user.entity";
 
 @Entity()
