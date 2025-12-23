@@ -20,8 +20,15 @@ export class TransactionsService {
     const category = await this.categoriesService.findOne(dto.categoryId, userId);
     const wallet = await this.walletsService.findOne(dto.walletId, userId);
 
+    // Chuẩn hóa dấu tiền theo loại danh mục
+    const signedAmount = category.type === CategoryType.INCOME
+      ? Math.abs(dto.amount)
+      : -Math.abs(dto.amount);
+
     const transaction = this.transactionRepo.create({
       ...dto,
+      amount: signedAmount,
+      date: dto.date ? new Date(dto.date) : new Date(),
       user: { id: userId },
       category,
       wallet,
@@ -29,9 +36,8 @@ export class TransactionsService {
 
     await this.transactionRepo.save(transaction);
 
-    // Update wallet balance
-    const amount = category.type === CategoryType.INCOME ? dto.amount : -dto.amount;
-    await this.walletsService.updateBalance(wallet.id, amount);
+    // Update wallet balance theo số tiền đã chuẩn hóa
+    await this.walletsService.updateBalance(wallet.id, signedAmount);
 
     return transaction;
   }
@@ -67,15 +73,44 @@ export class TransactionsService {
     return transaction;
   }
 
-  // TODO: Implement update logic with balance adjustment
   async update(id: string, userId: string, dto: UpdateTransactionDto) {
-    const transaction = await this.findOne(id, userId);
-    // Complex logic needed for balance update if amount/wallet changes
-    // For now, just update fields
-    return this.transactionRepo.save({
-      ...transaction,
+    const oldTransaction = await this.findOne(id, userId);
+    const newCategory = dto.categoryId && dto.categoryId !== oldTransaction.category.id
+      ? await this.categoriesService.findOne(dto.categoryId, userId)
+      : oldTransaction.category;
+
+    const newWallet = dto.walletId && dto.walletId !== oldTransaction.wallet.id
+      ? await this.walletsService.findOne(dto.walletId, userId)
+      : oldTransaction.wallet;
+
+    // Tính tiền ký mới dựa trên category mới
+    const newAmount = dto.amount !== undefined ? dto.amount : oldTransaction.amount;
+    const signedAmount = newCategory.type === CategoryType.INCOME
+      ? Math.abs(newAmount)
+      : -Math.abs(newAmount);
+
+    // Nếu amount hoặc wallet thay đổi, cần update wallet balance
+    if (newAmount !== oldTransaction.amount || newWallet.id !== oldTransaction.wallet.id) {
+      // Revert số tiền cũ từ wallet cũ
+      const reverseOldAmount = oldTransaction.category.type === CategoryType.INCOME
+        ? -oldTransaction.amount
+        : Math.abs(oldTransaction.amount);
+      await this.walletsService.updateBalance(oldTransaction.wallet.id, reverseOldAmount);
+
+      // Thêm số tiền mới vào wallet mới (có thể giống wallet cũ)
+      await this.walletsService.updateBalance(newWallet.id, signedAmount);
+    }
+
+    const updatedTransaction = await this.transactionRepo.save({
+      ...oldTransaction,
       ...dto,
+      amount: signedAmount,
+      category: newCategory,
+      wallet: newWallet,
+      date: dto.date ? new Date(dto.date) : oldTransaction.date,
     });
+
+    return updatedTransaction;
   }
 
   async remove(id: string, userId: string) {

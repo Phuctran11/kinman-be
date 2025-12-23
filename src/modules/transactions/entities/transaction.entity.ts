@@ -6,7 +6,14 @@ import { WalletEntity } from "../../wallets/entities/wallet.entity";
 
 @Entity()
 export class TransactionEntity extends SoftDeleteEntity {
-  @Column("decimal", { precision: 18, scale: 2 })
+  @Column("decimal", {
+    precision: 18,
+    scale: 2,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string | null) => (value === null ? null : Number(value)),
+    },
+  })
   amount: number;
 
   @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
