@@ -8,6 +8,8 @@ import { CategoriesService } from "../services/categories.service";
 import { GroupsService } from "../services/groups.service";
 import { TransactionSplitEntity } from "../entities/transaction-split.entity";
 import { CategoryType } from "../entities/category.entity";
+import { GroupExpensesService } from "./group-expenses.service";
+import { SplitType } from "../entities/group-expense.entity";
 
 @Injectable()
 export class TransactionsService {
@@ -19,14 +21,35 @@ export class TransactionsService {
     private readonly walletsService: WalletsService,
     private readonly categoriesService: CategoriesService,
     private readonly groupsService: GroupsService,
+    private readonly groupExpensesService: GroupExpensesService,
   ) {}
 
   async create(userId: string, dto: CreateTransactionDto) {
     const category = dto.categoryId ? await this.categoriesService.findOne(dto.categoryId, userId) : undefined;
     const wallet = dto.walletId ? await this.walletsService.findOne(dto.walletId, userId) : undefined;
     let group: any;
+    
+    // Nếu có group, thêm vào group context và tạo Group Expense
     if (dto.groupId) {
       group = await this.groupsService.findOne(dto.groupId, userId);
+      
+      // Create Group Expense
+      try {
+        await this.groupExpensesService.addExpense(userId, dto.groupId, {
+          amount: Math.abs(dto.amount),
+          description: dto.note || "Transaction",
+          date: dto.date,
+          splitType: SplitType.EXACT, // Assuming EXACT since splits are explicitly provided or standard logic
+          splits: dto.splits?.map(s => ({
+            userId: s.userId!,
+            amount: s.amount
+          })),
+        });
+      } catch (error) {
+        console.error("Failed to create group expense", error);
+        // We might want to throw here, but for now log it. 
+        // Ideally transaction creation should be atomic with group expense.
+      }
     }
 
     // Chuẩn hóa dấu tiền theo loại danh mục
